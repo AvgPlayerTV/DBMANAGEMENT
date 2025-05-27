@@ -1,1 +1,36 @@
+name: MySQL Backup
 
+on:
+  schedule:
+    - cron: '0 3 * * *'  # Every day 3:00 AM UTC
+  workflow_dispatch:      # Manual activation
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Install MySQL client
+        run: sudo apt-get install mysql-client -y
+
+      - name: Dump MySQL Database
+        run: |
+          TIMESTAMP=$(date +"%F-%H-%M-%S")
+          DUMP_FILE="backup-$TIMESTAMP.sql"
+          mysqldump -h ${{ secrets.MYSQL_HOST }} \
+                    -P ${{ secrets.MYSQL_PORT }} \
+                    -u ${{ secrets.MYSQL_USER }} \
+                    -p${{ secrets.MYSQL_PASSWORD }} \
+                    ${{ secrets.MYSQL_DATABASE }} > $DUMP_FILE
+          tar -czf $DUMP_FILE.tar.gz $DUMP_FILE
+          echo "DUMP_FILENAME=$DUMP_FILE.tar.gz" >> $GITHUB_ENV
+
+      # Optionn 1: Upload to workflow artifacts
+      - name: Upload Backup Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mysql-backup
+          path: ${{ env.DUMP_FILENAME }}
